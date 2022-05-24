@@ -8,7 +8,7 @@
 # Usage: ./sh-jail.sh /full/path/to/jail
 
 if [ -z $1 ] || [ -z $2 ]; then
-  printf "Usage: ${0} /full/path/to/your/jail ip.ad.dr.ess\n"
+  printf "Usage: ${0} /full/path/to/your/jail ip.ad.dr.ess [interface]\n"
   exit 1
 fi
 
@@ -16,16 +16,23 @@ cleanup() {
   if [ -d "${path}/root" ]; then
     printf "Cleaning up"
     /usr/local/bin/bastille destroy $name
-    ifconfig bastille0 delete $ip
+    ifconfig $iface delete $ip
   fi
 }
 
 path=$1
 ip=$2
+iface="bastille0"
 name=`basename $path`
 
+if [ ! -z $3 ]; then
+  #TODO check with ifconfig that this exists `ifconfig grep $3`
+  iface=$3
+  printf "Using specified interface ${iface}\n"
+fi
+
 if [ ! -d $path ] && [ ! -f $path/jail.conf ]; then
-  printf "Creating bastille jail ${name}\n"
+  printf "Creating Bastille jail ${name}\n"
   /usr/local/bin/bastille create -E $name
   if [ ! $? ]; then
     printf "Failed to create jail\n"
@@ -68,10 +75,10 @@ if [ ! $? ]; then
 fi
 
 printf "Modifying ${path}/jail.conf\n"
-sed -i '' "s/}/\n#  mount\.devfs;\n  exec\.clean;\n  exec\.start = '\/bin\/sh';\n  exec\.release = '\/sbin\/ifconfig bastille0 delete ${ip}';\n\n  interface = bastille0;\n  ip4\.addr = ${ip};\n  ip6 = disable;\n}/" "${path}/jail.conf"
+sed -i '' "s/}/\n#  mount\.devfs;\n  exec\.clean;\n  exec\.start = '\/bin\/sh';\n  exec\.release = '\/sbin\/ifconfig $iface delete ${ip}';\n\n  interface = $iface;\n  ip4\.addr = ${ip};\n  ip6 = disable;\n}/" "${path}/jail.conf"
 
-printf "Adding the jail IP to bastille0"
-ifconfig bastille0 add $ip
+printf "Adding the jail IP to ${iface}"
+ifconfig $iface add $ip
 
 printf "\n\nDone\nCheck jail.conf is correct:\n\n"
 cat $path/jail.conf
